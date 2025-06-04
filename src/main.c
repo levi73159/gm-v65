@@ -20,35 +20,10 @@ void delay_ms(u16 ms) {
 char buffer[10];
 bool is_started = false;
 int main() {
-    lcd_init();
-    enable_interrupts();
-
-    lcd_print("Press to start");
-    while (!is_started); // wait for button to be pressed
-    
-    lcd_instruction(LCD_CLEAR);
-    lcd_instruction(LCD_HOME);
-    lcd_print("counter: 0");
-
-    while (clock > 0) {
-        lcd_instruction(LCD_NEXT_LINE);
-        disable_interrupts();
-        int_to_str(clock, buffer);
-        lcd_print(buffer);
-        enable_interrupts();
-
-        delay_ms(1000);
-        clock--;
-    }
-
     disable_interrupts();
+    lcd_init();
 
-    lcd_instruction(LCD_CLEAR);
-    lcd_instruction(LCD_HOME);
-    lcd_print("Can you beat:");
-    lcd_instruction(LCD_NEXT_LINE);
-    int_to_str(counter, buffer);
-    lcd_print(buffer);
+    lcd_print("GM-65");
 
     return 0;
 }
@@ -71,14 +46,5 @@ void int_to_str(u16 num, char buf[]) {
 }
 
 void interrupt() {
-    if (!is_started) {
-        is_started = true;
-        return;
-    }
-    lcd_instruction(LCD_HOME); // cursor home
     counter++;
-    
-    int_to_str(counter, buffer);
-    lcd_print("counter: ");
-    lcd_print(buffer);
 }

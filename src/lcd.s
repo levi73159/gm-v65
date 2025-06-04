@@ -5,9 +5,9 @@ DDRB = $6002
 DDRA = $6003
 
 ; LCD bits
-E  = %10000000
-RW = %01000000
-RS = %00100000
+E  = %01000000
+RW = %00100000
+RS = %00010000
 
     .include "zeropage.inc"
 
@@ -16,10 +16,12 @@ RS = %00100000
 _lcd_init:
     lda #%11111111 ; Set all pins on port B to output
     sta DDRB
-    lda #%11100000 ; Set top 3 pins on port A to output
+    lda #%00000000 ; Set all pins on port A to input
     sta DDRA
 
-    lda #%00111000 ; Set 8-bit mode; 2-line display; 5x8 font
+    jsr lcd_init_start
+    
+    lda #%00101000 ; Set 4-bit mode; 2-line display; 5x8 font
     jsr _lcd_instruction
     lda #%00001110 ; Display on; cursor on; blink off
     jsr _lcd_instruction
@@ -29,24 +31,37 @@ _lcd_init:
     jsr _lcd_instruction
     rts
 
-
+lcd_init_start:
+    lda #%00000010 ; Set 4-bit mode
+    sta PORTB
+    ora #E
+    sta PORTB
+    and #%00001111
+    sta PORTB
 
 lcd_wait:
   pha
-  lda #%00000000  ; Port B is input
+  lda #%11110000  ; LCD data is input
   sta DDRB
 lcdbusy:
   lda #RW
-  sta PORTA
+  sta PORTB
   lda #(RW | E)
-  sta PORTA
-  lda PORTB
-  and #%10000000
+  sta PORTB
+  lda PORTB       ; Read high nibble
+  pha             ; and put on stack since it has the busy flag
+  lda #RW
+  sta PORTB
+  lda #(RW | E)
+  sta PORTB
+  lda PORTB       ; Read low nibble
+  pla             ; Get high nibble off stack
+  and #%00001000
   bne lcdbusy
 
   lda #RW
-  sta PORTA
-  lda #%11111111  ; Port B is output
+  sta PORTB
+  lda #%11111111  ; LCD data is output
   sta DDRB
   pla
   rts
@@ -54,25 +69,47 @@ lcdbusy:
     .export _lcd_instruction
 _lcd_instruction:
     jsr lcd_wait
+    pha
+    lsr
+    lsr
+    lsr
+    lsr            ; Send high 4 bits
     sta PORTB
-    lda #0         ; Clear RS/RW/E bits
-    sta PORTA
-    lda #E         ; Set E bit to send instruction
-    sta PORTA
-    lda #0         ; Clear RS/RW/E bits
-    sta PORTA
+    ora #E         ; Set E bit to send instruction
+    sta PORTB
+    eor #E         ; Clear E bit
+    sta PORTB
+    pla
+    and #%00001111 ; Send low 4 bits
+    sta PORTB
+    ora #E         ; Set E bit to send instruction
+    sta PORTB
+    eor #E         ; Clear E bit
+    sta PORTB
     rts
 
     .export _print_char
 _print_char:
     jsr lcd_wait
+    pha
+    lsr
+    lsr
+    lsr
+    lsr             ; Send high 4 bits
+    ora #RS         ; Set RS
     sta PORTB
-    lda #RS         ; Set RS; Clear RW/E bits
-    sta PORTA
-    lda #(RS | E)   ; Set E bit to send instruction
-    sta PORTA
-    lda #RS         ; Clear E bits
-    sta PORTA
+    ora #E          ; Set E bit to send instruction
+    sta PORTB
+    eor #E          ; Clear E bit
+    sta PORTB
+    pla
+    and #%00001111  ; Send low 4 bits
+    ora #RS         ; Set RS
+    sta PORTB
+    ora #E          ; Set E bit to send instruction
+    sta PORTB
+    eor #E          ; Clear E bit
+    sta PORTB
     rts
 
     .export _lcd_print
